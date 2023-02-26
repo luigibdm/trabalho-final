@@ -67,6 +67,8 @@ bd_ativas <- subset(bd, bd$SIT_REG=='ATIVO')
 # agrupa por tipo de mercado
 bd_mercados <-  bd_ativas %>% group_by(bd_ativas$TP_MERC) %>% summarise(n())
 
+bd_mercados <- bd_mercados[order(bd_mercados$`n()`, decreasing = TRUE),]
+
 ### filtrando por NA
 
 # seleciona apenas a linha NA
@@ -104,13 +106,30 @@ bd_mercados_total <- rbind(bd_mercados_ativas, linha_total)
 
 # muda o nome das colunas
 names(bd_mercados_total) <- c('Mercado','QTD','% Participação')
+
+
 ```
 
-Das **`r ativas`** empresas ativas, apenas **`r mercados_ativos`** possuem informação sobre o mercado no qual participam, portanto as **`r mercados_na`** empresas sem informação ficarão de fora dessa análise.
+Das **`r ativas`** empresas ativas, apenas **`r mercados_ativos`** possuem informação sobre o mercado no qual participam, enquanto **`r mercados_na`** empresas não informam sobre o tipo de mercado.
 
 ```{r}
 #| echo: false
-knitr::kable(bd_mercados_total)
+#knitr::kable(bd_mercados_total)
+```
+
+```{r}
+#| echo: false
+
+col_mercados <- bd_ativas[,12]
+
+col_mercados$TP_MERC[is.na(col_mercados$TP_MERC)] <- "NÃO INFORMA"
+
+bd_mercados$por <- paste0(round(as.numeric((bd_mercados$`n()`/sum(bd_mercados$`n()`))*100)),"%")
+
+x <- barplot((sort(table(col_mercados),decreasing=T)), xlab = "Tipo de Mercado", ylab = "QTD", col="lightblue", ylim=c(0,max(bd_mercados$`n()`+50)), cex.names = 0.6)
+
+text(x,labels=bd_mercados$por, col="black", cex=1.2, bd_mercados$`n()`+14)
+
 ```
 
 ## 2) Qual a distribuição por controle acionário?
@@ -118,6 +137,8 @@ knitr::kable(bd_mercados_total)
 ```{r, include=FALSE}
 # agrupa por controle acionário
 bd_ca <-  bd_ativas %>% group_by(bd_ativas$CONTROLE_ACIONARIO) %>% summarise(n())
+
+bd_ca <- bd_ca[order(bd_ca$`n()`, decreasing = TRUE),]
 
 ### filtrando por NA
 
@@ -163,7 +184,22 @@ Nesse caso, apenas **`r ca_na`** empresas não informam sobre o controle acioná
 ```{r}
 #| echo: false
 # plota a tabela
-knitr::kable(bd_ca_total)
+#knitr::kable(bd_ca_total)
+```
+
+```{r}
+#| echo: false
+col_ca <- bd_ativas[,17]
+
+col_ca$CONTROLE_ACIONARIO[is.na(col_ca$CONTROLE_ACIONARIO)] <- "NÃO INFORMA"
+
+bd_ca$por <- paste0(round(as.numeric((bd_ca$`n()`/sum(bd_ca$`n()`))*100)),"%")
+
+#bd_mercados$por <- round(as.numeric((bd_mercados$`n()`/sum(bd_mercados$`n()`))*100))
+
+y <- barplot((sort(table(col_ca),decreasing=T)), xlab = "Controle Acionário", ylab = "QTD", col="lightblue", ylim=c(0,max(bd_ca$`n()`+150)), cex.names = 0.4)
+
+text(y,labels=bd_ca$por, col="black", cex=1.2, bd_ca$`n()`+25)
 ```
 
 ## 3) Qual a distribuição por atividade econômica - TOP 10?
@@ -183,17 +219,25 @@ bd_atividades_ordenado <- bd_atividades[order(bd_atividades$`n()`, decreasing = 
 # TOP 10
 atividades <- bd_atividades_ordenado[1:10,]
 
+atividades <- atividades[order(atividades$`n()`, decreasing = TRUE),]
+
+atividades$pos <- c(1:nrow(atividades)) 
 # muda o nome das colunas
-names(atividades) <- c('Atividade','QTD')
+names(atividades) <- c('Atividade','QTD', 'POSICAO')
+
+#atividades <- atividades[order(atividades$QTD, decreasing = TRUE),]
 ```
 
 Aqui **`r bd_atividades_soma`** empresas estão presentes na análise, distribuídas em **`r nrow(bd_atividades)`** atividades econômicas diferentes, mas selecionamos apenas as 10 com o maior número de empresas.
 
 ```{r}
 #| echo: false
-# plota os gráficos
-ggplot(atividades, aes(y = QTD, x = Atividade, fill = QTD)) +
-  geom_bar(stat = "identity") + geom_label(aes(x = Atividade, y = QTD/2, label = QTD)) +
+# plota o gráfico
+
+atividades$por <- paste0(round(as.numeric((atividades$QTD/sum(atividades$QTD))*100)),"%")
+
+ggplot(atividades[order(atividades$QTD, decreasing = TRUE),], aes(y = QTD, x = Atividade, fill = QTD)) +
+  geom_bar(stat = "identity") + geom_label(aes(x = Atividade, y = QTD/2, label = por)) + geom_label(aes(x = Atividade, y = -3, label = POSICAO)) +
   coord_flip() 
 ```
 
@@ -213,7 +257,7 @@ bd_estados_soma <- sum(bd_estados$`n()`)
 names(bd_estados) <- c("Estado", "QTD")
 ```
 
-Aqui **`r bd_estados_soma`** empresas estão presentes na análise, distribuídas em **`r nrow(bd_estados)`** estados diferentes.
+Aqui **`r bd_estados_soma`** empresas estão distribuídas em **`r nrow(bd_estados)`** estados diferentes.
 
 ```{r, include=FALSE}
 # importa o mapa em shapefile
@@ -263,6 +307,7 @@ leaflet(data = brasileiro) %>%
             opacity = 0.8)
 ```
 
+
 ## 5) Quais as principais auditoras - TOP 5?
 
 ```{r}
@@ -275,55 +320,75 @@ bd_auditoras <- bd_auditoras[!is.na(bd_auditoras$`bd_ativas$AUDITOR`),]
 # ordena em ordem decrescente
 bd_auditoras_ordenado <- bd_auditoras[order(bd_auditoras$`n()`, decreasing = TRUE),]
 
+#bd_auditoras_ordenado$pos <- c(1:nrow(bd_auditoras_ordenado))
+
 auditoras <- bd_auditoras_ordenado[1:5,]
 
 # muda o nome das colunas
-names(auditoras) <- c('Auditora','QTD')
+
+auditoras$por <- paste0(round(as.numeric((auditoras$`n()`/sum(auditoras$`n()`))*100)),"%")
+
+names(auditoras) <- c('Auditora','QTD','Frequência')
 ```
 
 Das **`r nrow(bd_auditoras)`** auditoras que atendem às empresas da B3, selecionamos as 5 principais com o maior número de empresas auditadas.
 
 ```{r}
 #| echo: false
+auditoras |> reactable::reactable()
+```
+
+```{r, include=FALSE}
+#| echo: false
 # plota os gráficos
-ggplot(auditoras, aes(y = QTD, x = Auditora, fill = QTD)) +
-  geom_bar(stat = "identity") + geom_label(aes(x = Auditora, y = QTD/2, label = QTD)) +
-  coord_flip()
+
+#ggplot(auditoras, aes(y = QTD, x = Auditora, fill = QTD)) +
+ # geom_bar(stat = "identity") + geom_label(aes(x = Auditora, y = QTD/2, label = por)) + geom_label(aes(x = Auditora, y = -3, label = POSICAO)) + coord_flip()
 ```
 
 ## Conclusão
 
 ```{r, include=FALSE}
 todas_empresas <- sum(bd_nome_social$`n()`)
-ativas_por <- as.numeric(ativas/todas_empresas*100)
+ativas_por <- round(as.numeric(ativas/todas_empresas*100))
 
 # pricipal mercado
 mercado_principal <- bd_mercados_total[1,1]
 mercado_principal_qtd <- bd_mercados_total[1,2]
-mercado_principal_por <- as.numeric(mercado_principal_qtd/ativas*100)
+mercado_principal_por <- round(as.numeric(mercado_principal_qtd/ativas*100))
 
 # principal controle acionário
 ca_principal <- bd_ca_ativas[1,1]
 ca_principal_qtd <- bd_ca_ativas[1,2]
-ca_principal_por <- as.numeric(ca_principal_qtd/ativas*100)
+ca_principal_por <- round(as.numeric(ca_principal_qtd/ativas*100))
 
 # principal atividade
 atividade_principal <- atividades[1,1]
 atividade_principal_qtd <- atividades[1,2]
-atividade_principal_por <- as.numeric(atividade_principal_qtd/ativas*100)
+atividade_principal_por <- round(as.numeric(atividade_principal_qtd/ativas*100))
 
 # principal estado
 estado_principal <- bd_estados[1,1]
 estado_principal_qtd <- bd_estados[1,2]
-estado_principal_por <- as.numeric(estado_principal_qtd/ativas*100)
+estado_principal_por <- round(as.numeric(estado_principal_qtd/ativas*100))
 
 # principal auditora
 auditora_principal <- bd_auditoras_ordenado[1,1]
 auditora_principal_qtd <- bd_auditoras_ordenado[1,2]
-auditora_principal_por <- as.numeric(auditora_principal_qtd/ativas*100)
+auditora_principal_por <- round(as.numeric(auditora_principal_qtd/ativas*100))
 ```
 
-Vimos que das **`r todas_empresas`** listadas na B3, **`r ativas_por`%** estão com o registro Ativo, destas **`r mercado_principal_por`%** estão presentes no(a) `r mercado_principal`, **`r ca_principal_por`%** são de controle `r ca_principal`, **`r atividade_principal_por`%** são do setor de `r atividade_principal`, **`r estado_principal_por`%** concentram-se no estado de(o/a) `r estado_principal` e **`r auditora_principal_por`%** são auditadas pela `r auditora_principal`.
+Vimos que das **`r todas_empresas`** listadas na B3, **`r nrow(bd_ativas)` (`r ativas_por`%)** estão com o registro Ativo; destas, **`r mercado_principal_qtd` (`r mercado_principal_por`%)** estão presentes no(a) `r mercado_principal`, **`r ca_principal_qtd` (`r ca_principal_por`%)** são de controle `r ca_principal`, **`r atividade_principal_qtd` (`r atividade_principal_por`%)** são do setor de `r atividade_principal`, **`r estado_principal_qtd` (`r estado_principal_por`%)** concentram-se no estado de(o/a) `r estado_principal` e **`r auditora_principal_qtd` (`r auditora_principal_por`%)** são auditadas pela `r auditora_principal`.
+
+
+
+## Caso ainda queira verificar informações específicas das empresas, é só consultar a tabela abaixo:
+
+```{r}
+#| echo: false
+bd |> reactable::reactable(filterable = TRUE)
+```
+
 
 ## Referências
 
@@ -332,3 +397,7 @@ Vimos que das **`r todas_empresas`** listadas na B3, **`r ativas_por`%** estão 
 -   [Tutorial de como fazer um mapa do Brasil](https://dataficacao.wordpress.com/2017/02/21/criando-mapa-brasil-r/)
 
 -   [Mapa em shp do IBGE](https://www.ibge.gov.br/geociencias/downloads-geociencias.html)
+
+-   [Informações no site da B3](https://www.b3.com.br/pt_br/)
+
+-   [Créditos da Imagem](https://financasinteligentes.com/blog/b3-o-que-e-e-como-funciona-a-bolsa-de-valores/)
