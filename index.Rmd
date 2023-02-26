@@ -1,0 +1,334 @@
+---
+title: "Análise de Empresas da B3"
+author: "Luigi Martinelli"
+date: "Fevereiro de 2023"
+format: html
+params:
+  mes: 02
+  ano: 2023
+---
+
+## ![](imagem/b3.png)
+
+## Pacotes
+
+Para as análises utilizaremos os pacotes:
+
+```{r}
+#if(!require(devtools)) install.packages('devtools')
+#if(!require(GetDFPData2)) devtools::install_github('msperlin/GetDFPData2')
+```
+
+Carregando os pacotes:
+
+```{r}
+#library(GetDFPData2)
+#library(tidyverse)
+#library(ggplot2)
+#library(rgdal)
+#library(leaflet)
+```
+
+```{r, include=FALSE}
+library(GetDFPData2)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(rgdal)
+library(leaflet)
+```
+
+```{r, include=FALSE}
+# baixa a base completa
+bd <- get_info_companies() 
+
+# agrupa por nome social
+bd_nome_social <- bd %>% group_by(bd$DENOM_SOCIAL) %>% summarise(n())
+
+# agrupa por situação (ativa, cancelada, suspenso)
+bd_situacao <- bd %>% group_by(bd$SIT_REG) %>% summarise(n())
+
+#qtd de empresas ativas
+ativas <- as.numeric(bd_situacao[bd_situacao$`bd$SIT_REG`=="ATIVO",2])
+```
+
+## Introdução
+
+A B3 (Brasil, Bolsa e Balcão), mais conhecida como a bolsa brasileira, é um ambiente eletrônico em que são negociados os ativos de diversas empresas de capital aberto, desde títulos de dívida pública ou privada, como as do Tesouro Direto, e as debêntures, até derivativos (contratos futuros, opções, swap, etc.), isso sem falar das ações.
+
+Neste trabalho, o nosso objetivo é analisar as principais características das empresas que fazem parte da B3. Atualmente são **`r nrow(bd_nome_social)`** empresas listadas na "bolsa brasileira", sendo apenas **`r ativas`** empresas com o registro ativo. A seguir veremos quais as principais características das que estão ativas.
+
+## 1) Qual a distribuição por tipo de mercado?
+
+```{r, include=FALSE}
+### base completa apenas com as empresas ativas
+bd_ativas <- subset(bd, bd$SIT_REG=='ATIVO')
+
+# agrupa por tipo de mercado
+bd_mercados <-  bd_ativas %>% group_by(bd_ativas$TP_MERC) %>% summarise(n())
+
+### filtrando por NA
+
+# seleciona apenas a linha NA
+bd_mercados_na <- bd_mercados[is.na(bd_mercados$`bd_ativas$TP_MERC`),]
+
+# seleciona o valor da linha NA
+mercados_na <- as.numeric(bd_mercados_na[1,2])
+
+# seleciona todas as linhas exceto a NA
+bd_mercados_ativas <- bd_mercados[!is.na(bd_mercados$`bd_ativas$TP_MERC`),]
+
+# soma todas as empresas exceto as de NA
+mercados_ativos <- as.numeric(sum(bd_mercados_ativas$`n()`))
+
+### nova coluna
+
+# acrescenta uma coluna nova
+bd_mercados_ativas$Participacao <- num(bd_mercados_ativas$`n()`/mercados_ativos*100)
+
+# coloca a tabela em ordem decrescente de acordo com a quantidade
+bd_mercados_ativas <- bd_mercados_ativas[order(bd_mercados_ativas$`n()`, decreasing = TRUE),]
+
+# nomeia as colunas
+names(bd_mercados_ativas) <- c('A','B','C')
+
+### nova linha
+
+# cria uma linha de total
+linha_total <- data.frame(A='TOTAL',B=mercados_ativos,C=100.00)
+
+# acrescente a linha total ao data frame
+bd_mercados_total <- rbind(bd_mercados_ativas, linha_total) 
+
+### finaliza
+
+# muda o nome das colunas
+names(bd_mercados_total) <- c('Mercado','QTD','% Participação')
+```
+
+Das **`r ativas`** empresas ativas, apenas **`r mercados_ativos`** possuem informação sobre o mercado no qual participam, portanto as **`r mercados_na`** empresas sem informação ficarão de fora dessa análise.
+
+```{r}
+#| echo: false
+knitr::kable(bd_mercados_total)
+```
+
+## 2) Qual a distribuição por controle acionário?
+
+```{r, include=FALSE}
+# agrupa por controle acionário
+bd_ca <-  bd_ativas %>% group_by(bd_ativas$CONTROLE_ACIONARIO) %>% summarise(n())
+
+### filtrando por NA
+
+# seleciona apenas a linha NA
+bd_ca_na <- bd_ca[is.na(bd_ca$`bd_ativas$CONTROLE_ACIONARIO`),]
+
+# seleciona o valor da linha NA
+ca_na <- as.numeric(bd_ca_na[1,2])
+
+# seleciona todas as linhas exceto a NA
+bd_ca_ativas <- bd_ca[!is.na(bd_ca$`bd_ativas$CONTROLE_ACIONARIO`),]
+
+# soma todas as empresas exceto as de NA
+ca_ativos <- as.numeric(sum(bd_ca_ativas$`n()`))
+
+### nova coluna
+
+# acrescenta uma coluna nova
+bd_ca_ativas$Participacao <- num(bd_ca_ativas$`n()`/ca_ativos*100)
+
+# coloca a tabela em ordem decrescente de acordo com a quantidade
+bd_ca_ativas <- bd_ca_ativas[order(bd_ca_ativas$`n()`, decreasing = TRUE),]
+
+# nomeia as colunas
+names(bd_ca_ativas) <- c('A','B','C')
+
+### nova linha
+
+# cria uma linha de total
+linha_total_ca <- data.frame(A='TOTAL',B=ca_ativos,C=100.00)
+
+# acrescente a linha total ao data frame
+bd_ca_total <- rbind(bd_ca_ativas, linha_total_ca) 
+
+### finaliza
+
+# muda o nome das colunas
+names(bd_ca_total) <- c('Controle Acionário','QTD','% Participação')
+```
+
+Nesse caso, apenas **`r ca_na`** empresas não informam sobre o controle acionário, restanto portanto **`r ca_ativos`** empresas para a análise.
+
+```{r}
+#| echo: false
+# plota a tabela
+knitr::kable(bd_ca_total)
+```
+
+## 3) Qual a distribuição por atividade econômica - TOP 10?
+
+```{r}
+#| echo: false
+# agrupa por atividade econômica
+bd_atividades <-  bd_ativas %>% group_by(bd_ativas$SETOR_ATIV) %>% summarise(n())
+
+bd_atividades <- bd_atividades[!is.na(bd_atividades$`bd_ativas$SETOR_ATIV`),]
+
+bd_atividades_soma <- sum(bd_atividades$`n()`)
+
+# ordena em ordem decrescente
+bd_atividades_ordenado <- bd_atividades[order(bd_atividades$`n()`, decreasing = TRUE),]
+
+# TOP 10
+atividades <- bd_atividades_ordenado[1:10,]
+
+# muda o nome das colunas
+names(atividades) <- c('Atividade','QTD')
+```
+
+Aqui **`r bd_atividades_soma`** empresas estão presentes na análise, distribuídas em **`r nrow(bd_atividades)`** atividades econômicas diferentes, mas selecionamos apenas as 10 com o maior número de empresas.
+
+```{r}
+#| echo: false
+# plota os gráficos
+ggplot(atividades, aes(y = QTD, x = Atividade, fill = QTD)) +
+  geom_bar(stat = "identity") + geom_label(aes(x = Atividade, y = QTD/2, label = QTD)) +
+  coord_flip() 
+```
+
+## 4) Onde se concentram?
+
+```{r, include=FALSE}
+# agrupa por uf
+bd_estados <-  bd_ativas %>% group_by(bd_ativas$UF) %>% summarise(n())
+
+bd_estados <- bd_estados[!is.na(bd_estados$`bd_ativas$UF`),]
+
+bd_estados <- bd_estados[order(bd_estados$`n()`, decreasing = TRUE),]
+
+bd_estados_soma <- sum(bd_estados$`n()`)
+
+# muda o nome das colunas
+names(bd_estados) <- c("Estado", "QTD")
+```
+
+Aqui **`r bd_estados_soma`** empresas estão presentes na análise, distribuídas em **`r nrow(bd_estados)`** estados diferentes.
+
+```{r, include=FALSE}
+# importa o mapa em shapefile
+shp <- readOGR("mapa\\.", "BR_UF_2021", stringsAsFactors=FALSE, encoding="UTF-8")
+
+# importa a tabela dos códicos de estados do ibge
+ibge <- read.csv("estados_ibge\\estadosibge.csv", header=T,sep=",")
+
+# mescla a base de dados com a tabela do ibge
+bd_estados_ibge <- merge(bd_estados, ibge, by.x = "Estado", by.y = "SIGLA")
+
+# mescla a nova base de dados com o arquivo em shp
+brasileiro <- merge(shp,bd_estados_ibge, by.x = "CD_UF", by.y = "COD")
+
+# carrega as coordenadas
+proj4string(brasileiro) <- CRS("+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs")
+
+# exclui os estados sem informação
+brasileiro$QTD[is.na(brasileiro$QTD)] <- 0
+
+# salva o arquivo em UTF-8
+Encoding(brasileiro$NM_UF) <- "UTF-8"
+
+# carrega as cores 
+pal <- colorBin("Blues",domain = NULL,n=5) #cores do mapa
+
+```
+
+```{r}
+#| echo: false
+# gerando mapa
+state_popup <- paste0("<strong>Estado: </strong>", 
+                      brasileiro$NM_UF, 
+                      "<br><strong>Pontos: </strong>", 
+                      brasileiro$QTD)
+leaflet(data = brasileiro) %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addPolygons(fillColor = ~pal(brasileiro$QTD), 
+              fillOpacity = 0.8, 
+              color = "#BDBDC3", 
+              weight = 1, 
+              popup = state_popup) %>%
+    addLegend("bottomright",
+            title = "QTD Empresas",
+            pal = colorNumeric(palette = pal, domain = brasileiro$QTD),
+            values = brasileiro$QTD,
+            opacity = 0.8)
+```
+
+## 5) Quais as principais auditoras - TOP 5?
+
+```{r}
+#| echo: false
+# agrupa por controle acionário
+bd_auditoras <-  bd_ativas %>% group_by(bd_ativas$AUDITOR) %>% summarise(n())
+
+bd_auditoras <- bd_auditoras[!is.na(bd_auditoras$`bd_ativas$AUDITOR`),]
+
+# ordena em ordem decrescente
+bd_auditoras_ordenado <- bd_auditoras[order(bd_auditoras$`n()`, decreasing = TRUE),]
+
+auditoras <- bd_auditoras_ordenado[1:5,]
+
+# muda o nome das colunas
+names(auditoras) <- c('Auditora','QTD')
+```
+
+Das **`r nrow(bd_auditoras)`** auditoras que atendem às empresas da B3, selecionamos as 5 principais com o maior número de empresas auditadas.
+
+```{r}
+#| echo: false
+# plota os gráficos
+ggplot(auditoras, aes(y = QTD, x = Auditora, fill = QTD)) +
+  geom_bar(stat = "identity") + geom_label(aes(x = Auditora, y = QTD/2, label = QTD)) +
+  coord_flip()
+```
+
+## Conclusão
+
+```{r, include=FALSE}
+todas_empresas <- sum(bd_nome_social$`n()`)
+ativas_por <- as.numeric(ativas/todas_empresas*100)
+
+# pricipal mercado
+mercado_principal <- bd_mercados_total[1,1]
+mercado_principal_qtd <- bd_mercados_total[1,2]
+mercado_principal_por <- as.numeric(mercado_principal_qtd/ativas*100)
+
+# principal controle acionário
+ca_principal <- bd_ca_ativas[1,1]
+ca_principal_qtd <- bd_ca_ativas[1,2]
+ca_principal_por <- as.numeric(ca_principal_qtd/ativas*100)
+
+# principal atividade
+atividade_principal <- atividades[1,1]
+atividade_principal_qtd <- atividades[1,2]
+atividade_principal_por <- as.numeric(atividade_principal_qtd/ativas*100)
+
+# principal estado
+estado_principal <- bd_estados[1,1]
+estado_principal_qtd <- bd_estados[1,2]
+estado_principal_por <- as.numeric(estado_principal_qtd/ativas*100)
+
+# principal auditora
+auditora_principal <- bd_auditoras_ordenado[1,1]
+auditora_principal_qtd <- bd_auditoras_ordenado[1,2]
+auditora_principal_por <- as.numeric(auditora_principal_qtd/ativas*100)
+```
+
+Vimos que das **`r todas_empresas`** listadas na B3, **`r ativas_por`%** estão com o registro Ativo, destas **`r mercado_principal_por`%** estão presentes no(a) `r mercado_principal`, **`r ca_principal_por`%** são de controle `r ca_principal`, **`r atividade_principal_por`%** são do setor de `r atividade_principal`, **`r estado_principal_por`%** concentram-se no estado de(o/a) `r estado_principal` e **`r auditora_principal_por`%** são auditadas pela `r auditora_principal`.
+
+## Referências
+
+-   [Sobre o pacote GetDFPData2](https://github.com/msperlin/GetDFPData2)
+
+-   [Tutorial de como fazer um mapa do Brasil](https://dataficacao.wordpress.com/2017/02/21/criando-mapa-brasil-r/)
+
+-   [Mapa em shp do IBGE](https://www.ibge.gov.br/geociencias/downloads-geociencias.html)
